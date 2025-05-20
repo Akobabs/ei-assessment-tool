@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EI Assessment Tool</title>
+  <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.development.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.development.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/babel-standalone@7.22.5/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/axios@1.4.0/dist/axios.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    const App = () => {
+      const [user, setUser] = useState(null);
+      const [email, setEmail] = useState('');
+      const [password, setPassword] = useState('');
+      const [assessment, setAssessment] = useState([]);
+      const [answers, setAnswers] = useState({});
+      const [feedback, setFeedback] = useState(null);
+
+      const login = async () => {
+        try {
+          const res = await axios.post('http://localhost:3001/api/auth/login', { email, password });
+          setUser(res.data.user);
+          localStorage.setItem('token', res.data.token);
+        } catch (err) {
+          console.error('Login failed:', err);
+          alert('Invalid credentials');
+        }
+      };
+
+      const fetchAssessment = async () => {
+        try {
+          const res = await axios.get('http://localhost:3001/api/assessment', {
+            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+          });
+          setAssessment(res.data.questions);
+        } catch (err) {
+          console.error('Fetch assessment failed:', err);
+        }
+      };
+
+      const submitAssessment = async () => {
+        try {
+          const res = await axios.post('http://localhost:3001/api/assessment/submit', 
+            { answers: Object.values(answers) },
+            { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+          );
+          setFeedback(res.data);
+        } catch (err) {
+          console.error('Submit assessment failed:', err);
+        }
+      };
+
+      const handleAnswer = (id, value) => {
+        setAnswers(prev => ({ ...prev, [id]: value }));
+      };
+
+      useEffect(() => {
+        if (user) fetchAssessment();
+      }, [user]);
+
+      return (
+        <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center p-4">
+          {!user ? (
+            <div className="bg-white p-6 rounded shadow-md w-full max-w-md">
+              <h1 className="text-2xl font-bold mb-4">Login</h1>
+              <input
+                type="email"
+                placeholder="Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full p-2 mb-4 border rounded"
+              />
+              <input
+                type="password"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full p-2 mb-4 border rounded"
+              />
+              <button
+                onClick={login}
+                className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600"
+              >
+                Login
+              </button>
+            </div>
+          ) : (
+            <div className="bg-white p-6 rounded shadow-md w-full max-w-2xl">
+              <h1 className="text-2xl font-bold mb-4">EI Assessment</h1>
+              {assessment.map((q) => (
+                <div key={q.id} className="mb-4">
+                  <p>{q.text}</p>
+                  <select
+                    className="w-full p-2 border rounded"
+                    onChange={(e) => handleAnswer(q.id, e.target.value)}
+                  >
+                    <option value="">Select</option>
+                    <option value="1">Strongly Disagree</option>
+                    <option value="2">Disagree</option>
+                    <option value="3">Neutral</option>
+                    <option value="4">Agree</option>
+                    <option value="5">Strongly Agree</option>
+                  </select>
+                </div>
+              ))}
+              <button
+                onClick={submitAssessment}
+                className="w-full bg-green-500 text-white p-2 rounded hover:bg-green-600"
+              >
+                Submit
+              </button>
+              {feedback && (
+                <div className="mt-4 p-4 bg-gray-100 rounded">
+                  <h2 className="text-xl font-semibold">Feedback</h2>
+                  <p>{feedback.message}</p>
+                  <ul>
+                    {feedback.recommendations.map((rec, idx) => (
+                      <li key={idx}>{rec}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    ReactDOM.render(<App />, document.getElementById('root'));
+  </script>
+</body>
+</html>
